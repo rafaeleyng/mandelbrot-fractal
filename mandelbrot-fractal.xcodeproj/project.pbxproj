@@ -238,6 +238,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				HEADER_SEARCH_PATHS = (
+					/opt/X11/include,
+					/opt/X11/lib,
+				);
+				OTHER_LDFLAGS = X11;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -246,6 +251,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				HEADER_SEARCH_PATHS = (
+					/opt/X11/include,
+					/opt/X11/lib,
+				);
+				OTHER_LDFLAGS = X11;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
