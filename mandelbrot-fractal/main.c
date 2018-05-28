@@ -162,40 +162,104 @@ static unsigned mandel_float_period(float cr, float ci)
     return MAX_ITER;
 }
 
-static void display_float_period(int size, float xmin, float xmax, float ymin, float ymax)
+typedef struct thread_data thread_data;
+struct thread_data
 {
+    int size;
+    int num;
+    float xmin, xmax;
+    float ymin, ymax;
+};
+
+/* Change this to 1 to update the image line-by-line */
+static const int show = 1;
+static pthread_mutex_t x_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static const int MAX_THREADS = 4;
+
+static void *thread_func(void *data)
+{
+    thread_data *td = data;
+
     int x, y;
+
+    float xscal = (td->xmax - td->xmin) / td->size;
+    float yscal = (td->ymax - td->ymin) / td->size;
 
     float cr, ci;
 
-    float xscal = (xmax - xmin) / size;
-    float yscal = (ymax - ymin) / size;
-
     unsigned counts;
 
-    for (y = 0; y < size; y++)
+    for (y = td->num; y < td->size; y += MAX_THREADS)
     {
-        for (x = 0; x < size; x++)
+        for (x = 0; x < td->size; x++)
         {
-            cr = xmin + x * xscal;
-            ci = ymin + y * yscal;
+            cr = td->xmin + x * xscal;
+            ci = td->ymin + y * yscal;
 
             counts = mandel_float_period(cr, ci);
 
-            ((unsigned *) bitmap->data)[x + y*size] = cols[counts];
+            ((unsigned *) bitmap->data)[x + y * td->size] = cols[counts];
         }
 
-        /* Display it */
+        if (show)
+        {
+            pthread_mutex_lock(&x_lock);
+            /* Display it */
+            XPutImage(dpy, win, gc, bitmap,
+                      0, y, 0, y,
+                      td->size, 1);
+            pthread_mutex_unlock(&x_lock);
+        }
+    }
+
+    free(td);
+
+    return NULL;
+}
+
+static void display_mandelbrot_set(int size, float xmin, float xmax, float ymin, float ymax)
+{
+    int i;
+    thread_data *td;
+
+    pthread_t *threads = malloc(sizeof(pthread_t) * MAX_THREADS);
+    if (!threads) errx(1, "Out of memory\n");
+
+    for (i = 0; i < MAX_THREADS; i++)
+    {
+        td = malloc(sizeof(thread_data));
+        if (!td) errx(1, "Out of memory\n");
+
+        td->size = size;
+        td->num = i;
+        td->xmin = xmin;
+        td->xmax = xmax;
+        td->ymin = ymin;
+        td->ymax = ymax;
+
+        if (pthread_create(&threads[i], NULL, thread_func, td)) errx(1, "pthread_create failed\n");
+    }
+
+    for (i = 0; i < MAX_THREADS; i++)
+    {
+        if (pthread_join(threads[i], NULL)) errx(1, "pthread_join failed\n");
+    }
+
+    free(threads);
+
+    if (!show)
+    {
         XPutImage(dpy, win, gc, bitmap,
-                  0, y, 0, y,
-                  size, 1);
+                  0, 0, 0, 0,
+                  size, size);
     }
 
     XFlush(dpy);
 }
 
 /* Image size */
-#define ASIZE 1000
+#define ASIZE 800
 
 /* Comment out this for benchmarking */
 #define WAIT_EXIT
@@ -212,7 +276,7 @@ int main(void)
 
     init_colours();
 
-    display_float_period(ASIZE, xmin, xmax, ymin, ymax);
+    display_mandelbrot_set(ASIZE, xmin, xmax, ymin, ymax);
 
 #ifdef WAIT_EXIT
     while(1)
