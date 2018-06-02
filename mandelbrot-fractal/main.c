@@ -5,73 +5,41 @@
 #import <pthread.h>
 #import <err.h>
 
+#import "colors.h"
 #import "x11-helpers.h"
 
 static pthread_mutex_t x_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static const int MAX_THREADS = 4;
-
-#define MAX_ITER    (1 << 14)
-static unsigned cols[MAX_ITER + 1];
-
-static void init_colours(void)
-{
-  int i;
-
-  for (i = 0; i < MAX_ITER; i++)
-  {
-    char r = (rand() & 0xff) * MAX_ITER / (i + MAX_ITER + 1);
-    char g = (rand() & 0xff) * MAX_ITER / (i + MAX_ITER + 1);
-    char b = (rand() & 0xff) * MAX_ITER / (i + MAX_ITER + 1);
-
-    cols[i] = b + 256 * g + 256 * 256 * r;
-  }
-
-  cols[MAX_ITER] = 0;
-}
-
-static unsigned mandel_float_period(float cr, float ci)
-{
-  float zr = cr, zi = ci;
-  float tmp;
-
-  float ckr, cki;
-
-  unsigned p = 0, ptot = 8;
-
-  do
-  {
-    ckr = zr;
-    cki = zi;
-
-    ptot += ptot;
-    if (ptot > MAX_ITER) ptot = MAX_ITER;
-
-    for (; p < ptot; p++)
-    {
-      tmp = zr * zr - zi * zi + cr;
-      zi *= 2 * zr;
-      zi += ci;
-      zr = tmp;
-
-      if (zr * zr + zi * zi > 4.0) return p;
-
-      if ((zr == ckr) && (zi == cki)) return MAX_ITER;
-    }
-  }
-  while (ptot != MAX_ITER);
-
-  return MAX_ITER;
-}
+static const int MAX_ITERATIONS = 1024;
+static unsigned colors[MAX_ITERATIONS] = {0};
 
 typedef struct thread_data thread_data;
-struct thread_data
-{
+struct thread_data {
   int size;
   int num;
   float xmin, xmax;
   float ymin, ymax;
 };
+
+static unsigned mandel_float(float cr, float ci) {
+  float zr = cr, zi = ci;
+  float tmp;
+
+  unsigned i;
+
+  for (i = 0; i < MAX_ITERATIONS - 1; i++)
+  {
+    tmp = zr * zr - zi * zi + cr;
+    zi *= 2 * zr;
+    zi += ci;
+    zr = tmp;
+
+    if (zr * zr + zi * zi > 4.0) break;
+  }
+
+  return i;
+}
 
 static void *thread_func(void *data)
 {
@@ -93,9 +61,9 @@ static void *thread_func(void *data)
       cr = td->xmin + x * xscal;
       ci = td->ymin + y * yscal;
 
-      counts = mandel_float_period(cr, ci);
+      counts = mandel_float(cr, ci);
 
-      ((unsigned *) x_image->data)[x + y * td->size] = cols[counts];
+      ((unsigned *) x_image->data)[x + y * td->size] = colors[counts];
     }
 
     pthread_mutex_lock(&x_lock);
@@ -143,7 +111,7 @@ static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin,
 }
 
 int main(void) {
-  init_colours();
+  init_colors(colors, MAX_ITERATIONS);
 
   const int IMAGE_SIZE = 800;
   x11_init(IMAGE_SIZE);

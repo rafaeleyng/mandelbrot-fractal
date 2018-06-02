@@ -24,6 +24,7 @@
 
 /* Begin PBXFileReference section */
 		5349CFC920C329A2003815B2 /* x11-helpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "x11-helpers.h"; sourceTree = "<group>"; };
+		5349CFCA20C331FE003815B2 /* colors.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = colors.h; sourceTree = "<group>"; };
 		53DFA8DB20B901AC00BB22EA /* mandelbrot-fractal */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "mandelbrot-fractal"; sourceTree = BUILT_PRODUCTS_DIR; };
 		53DFA8DE20B901AC00BB22EA /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,6 +61,7 @@
 			children = (
 				53DFA8DE20B901AC00BB22EA /* main.c */,
 				5349CFC920C329A2003815B2 /* x11-helpers.h */,
+				5349CFCA20C331FE003815B2 /* colors.h */,
 			);
 			path = "mandelbrot-fractal";
 			sourceTree = "<group>";
