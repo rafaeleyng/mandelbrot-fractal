@@ -164,8 +164,6 @@ struct thread_data
   float ymin, ymax;
 };
 
-/* Change this to 1 to update the image line-by-line */
-static const int show = 1;
 static pthread_mutex_t x_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static const int MAX_THREADS = 4;
@@ -195,15 +193,12 @@ static void *thread_func(void *data)
       ((unsigned *) bitmap->data)[x + y * td->size] = cols[counts];
     }
 
-    if (show)
-    {
-      pthread_mutex_lock(&x_lock);
-      /* Display it */
-      XPutImage(dpy, win, gc, bitmap,
-                0, y, 0, y,
-                td->size, 1);
-      pthread_mutex_unlock(&x_lock);
-    }
+    pthread_mutex_lock(&x_lock);
+
+    XPutImage(dpy, win, gc, bitmap,
+              0, y, 0, y,
+              td->size, 1);
+    pthread_mutex_unlock(&x_lock);
   }
 
   free(td);
@@ -241,18 +236,8 @@ static void display_mandelbrot_set(int size, float xmin, float xmax, float ymin,
 
   free(threads);
 
-  if (!show)
-  {
-    XPutImage(dpy, win, gc, bitmap,
-              0, 0, 0, 0,
-              size, size);
-  }
-
   XFlush(dpy);
 }
-
-/* Image size */
-#define ASIZE 800
 
 int main(void) {
   double xmin = -2;
@@ -260,11 +245,13 @@ int main(void) {
   double ymin = -1.5;
   double ymax = 1.5;
 
-  init_x11(ASIZE);
+  const int IMAGE_SIZE = 800;
+
+  init_x11(IMAGE_SIZE);
 
   init_colours();
 
-  display_mandelbrot_set(ASIZE, xmin, xmax, ymin, ymax);
+  display_mandelbrot_set(IMAGE_SIZE, xmin, xmax, ymin, ymax);
 
   while(1) {
     XEvent event;
@@ -277,7 +264,7 @@ int main(void) {
       XPutImage(
                 dpy, win, gc, bitmap,
                 0, 0, 0, 0,
-                ASIZE, ASIZE
+                IMAGE_SIZE, IMAGE_SIZE
                 );
     }
 
