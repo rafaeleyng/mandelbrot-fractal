@@ -26,8 +26,8 @@ static void x11_init(int image_size) {
   /* Failure */
   if (!display) exit(0);
 
-  unsigned long white = WhitePixel(display, DefaultScreen(display));
-  unsigned long black = BlackPixel(display, DefaultScreen(display));
+  long white = WhitePixel(display, DefaultScreen(display));
+  long black = BlackPixel(display, DefaultScreen(display));
 
   window = XCreateSimpleWindow(display,
                             DefaultRootWindow(display),
@@ -89,7 +89,7 @@ static void x11_destroy(void) {
   XCloseDisplay(display);
 }
 
-static void x11_put_image(int src_x, int src_y, int dest_x, int dest_y, unsigned int width, unsigned int height) {
+static void x11_put_image(int src_x, int src_y, int dest_x, int dest_y, int width, int height) {
   XPutImage(display, window, gc, x_image, src_x, src_y, dest_x, dest_y, width, height);
 }
 

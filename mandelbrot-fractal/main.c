@@ -12,7 +12,7 @@ static pthread_mutex_t x_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static const int MAX_THREADS = 4;
 static const int MAX_ITERATIONS = 1024;
-static unsigned colors[MAX_ITERATIONS] = {0};
+static int colors[MAX_ITERATIONS] = {0};
 
 typedef struct thread_data thread_data;
 struct thread_data {
@@ -22,47 +22,37 @@ struct thread_data {
   float ymin, ymax;
 };
 
-static unsigned mandel_float(float cr, float ci) {
+static int mandel_float(float cr, float ci) {
   float zr = cr, zi = ci;
-  float tmp;
 
-  unsigned i;
-
-  for (i = 0; i < MAX_ITERATIONS - 1; i++)
-  {
+  int i;
+  for (i = 0; i < MAX_ITERATIONS - 1; i++) {
+    float tmp;
     tmp = zr * zr - zi * zi + cr;
     zi *= 2 * zr;
     zi += ci;
     zr = tmp;
 
-    if (zr * zr + zi * zi > 4.0) break;
+    if (zr * zr + zi * zi > 4.0) {
+      break;
+    }
   }
 
   return i;
 }
 
-static void *thread_func(void *data)
-{
+static void *thread_func(void *data) {
   thread_data *td = data;
-
-  int x, y;
 
   float xscal = (td->xmax - td->xmin) / td->size;
   float yscal = (td->ymax - td->ymin) / td->size;
 
-  float cr, ci;
+  for (int y = td->num; y < td->size; y += MAX_THREADS) {
+    for (int x = 0; x < td->size; x++) {
+      float cr = td->xmin + x * xscal;
+      float ci = td->ymin + y * yscal;
 
-  unsigned counts;
-
-  for (y = td->num; y < td->size; y += MAX_THREADS)
-  {
-    for (x = 0; x < td->size; x++)
-    {
-      cr = td->xmin + x * xscal;
-      ci = td->ymin + y * yscal;
-
-      counts = mandel_float(cr, ci);
-
+      int counts = mandel_float(cr, ci);
       ((unsigned *) x_image->data)[x + y * td->size] = colors[counts];
     }
 
@@ -76,18 +66,11 @@ static void *thread_func(void *data)
   return NULL;
 }
 
-static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin, float ymax)
-{
-  int i;
-  thread_data *td;
-
+static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin, float ymax) {
   pthread_t *threads = malloc(sizeof(pthread_t) * MAX_THREADS);
-  if (!threads) errx(1, "Out of memory\n");
 
-  for (i = 0; i < MAX_THREADS; i++)
-  {
-    td = malloc(sizeof(thread_data));
-    if (!td) errx(1, "Out of memory\n");
+  for (int i = 0; i < MAX_THREADS; i++) {
+    thread_data *td = malloc(sizeof(thread_data));
 
     td->size = size;
     td->num = i;
@@ -96,12 +79,11 @@ static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin,
     td->ymin = ymin;
     td->ymax = ymax;
 
-    if (pthread_create(&threads[i], NULL, thread_func, td)) errx(1, "pthread_create failed\n");
+    pthread_create(&threads[i], NULL, thread_func, td);
   }
 
-  for (i = 0; i < MAX_THREADS; i++)
-  {
-    if (pthread_join(threads[i], NULL)) errx(1, "pthread_join failed\n");
+  for (int i = 0; i < MAX_THREADS; i++) {
+    pthread_join(threads[i], NULL);
   }
 
   free(threads);

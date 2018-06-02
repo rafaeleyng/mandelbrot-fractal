@@ -9,7 +9,7 @@
 #ifndef colors_h
 #define colors_h
 
-static void init_colors(unsigned *colors, int length) {
+static void init_colors(int *colors, int length) {
   for (int i= 0; i < length - 1; i++) {
     int r = rand();
     int g = rand();
