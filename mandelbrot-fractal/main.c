@@ -8,7 +8,7 @@
 #import "colors.h"
 #import "x11-helpers.h"
 
-static pthread_mutex_t x_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex;
 
 static const int MAX_THREADS = 4;
 static const int MAX_ITERATIONS = 1024;
@@ -41,7 +41,7 @@ static int mandel_float(float cr, float ci) {
   return i;
 }
 
-static void *thread_func(void *data) {
+static void *producer(void *data) {
   thread_data *td = data;
 
   float xscal = (td->xmax - td->xmin) / td->size;
@@ -56,9 +56,9 @@ static void *thread_func(void *data) {
       ((unsigned *) x_image->data)[x + y * td->size] = colors[counts];
     }
 
-    pthread_mutex_lock(&x_lock);
+    pthread_mutex_lock(&mutex);
     x11_put_image(0, y, 0, y, td->size, 1);
-    pthread_mutex_unlock(&x_lock);
+    pthread_mutex_unlock(&mutex);
   }
 
   free(td);
@@ -79,7 +79,7 @@ static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin,
     td->ymin = ymin;
     td->ymax = ymax;
 
-    pthread_create(&threads[i], NULL, thread_func, td);
+    pthread_create(&threads[i], NULL, producer, td);
   }
 
   for (int i = 0; i < MAX_THREADS; i++) {
@@ -93,7 +93,9 @@ static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin,
 }
 
 int main(void) {
-  init_colors(colors, MAX_ITERATIONS);
+  pthread_mutex_init(&mutex, NULL);
+
+  colors_init(colors, MAX_ITERATIONS);
 
   const int IMAGE_SIZE = 800;
   x11_init(IMAGE_SIZE);
