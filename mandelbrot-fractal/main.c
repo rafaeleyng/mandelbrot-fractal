@@ -5,102 +5,11 @@
 #import <pthread.h>
 #import <err.h>
 
-#import <X11/Xlib.h>
-#import <X11/Xutil.h>
+#import "x11-helpers.h"
 
-/* X11 data */
-static Display *dpy;
-static Window win;
-static XImage *bitmap;
-static Atom wmDeleteMessage;
-static GC gc;
+static pthread_mutex_t x_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void exit_x11(void)
-{
-  XDestroyImage(bitmap);
-  XDestroyWindow(dpy, win);
-  XCloseDisplay(dpy);
-}
-
-static void init_x11(int size)
-{
-  int bytes_per_pixel;
-
-  /* Attempt to open the display */
-  dpy = XOpenDisplay(NULL);
-
-  /* Failure */
-  if (!dpy) exit(0);
-
-  unsigned long white = WhitePixel(dpy,DefaultScreen(dpy));
-  unsigned long black = BlackPixel(dpy,DefaultScreen(dpy));
-
-
-  win = XCreateSimpleWindow(dpy,
-                            DefaultRootWindow(dpy),
-                            0, 0,
-                            size, size,
-                            0, black,
-                            white);
-
-  /* We want to be notified when the window appears */
-  XSelectInput(dpy, win, StructureNotifyMask);
-
-  /* Make it appear */
-  XMapWindow(dpy, win);
-
-  while (1)
-  {
-    XEvent e;
-    XNextEvent(dpy, &e);
-    if (e.type == MapNotify) break;
-  }
-
-  XTextProperty tp;
-  char name[128] = "Mandelbrot";
-  char *n = name;
-  Status st = XStringListToTextProperty(&n, 1, &tp);
-  if (st) XSetWMName(dpy, win, &tp);
-
-  /* Wait for the MapNotify event */
-  XFlush(dpy);
-
-  int ii, jj;
-  int depth = DefaultDepth(dpy, DefaultScreen(dpy));
-  Visual *visual = DefaultVisual(dpy, DefaultScreen(dpy));
-  int total;
-
-  /* Determine total bytes needed for image */
-  ii = 1;
-  jj = (depth - 1) >> 2;
-  while (jj >>= 1) ii <<= 1;
-
-  /* Pad the scanline to a multiple of 4 bytes */
-  total = size * ii;
-  total = (total + 3) & ~3;
-  total *= size;
-  bytes_per_pixel = ii;
-
-  if (bytes_per_pixel != 4)
-  {
-    printf("Need 32bit colour screen!");
-
-  }
-
-  /* Make bitmap */
-  bitmap = XCreateImage(dpy, visual, depth,
-                        ZPixmap, 0, malloc(total),
-                        size, size, 32, 0);
-
-  /* Init GC */
-  gc = XCreateGC(dpy, win, 0, NULL);
-  XSetForeground(dpy, gc, black);
-
-  XSelectInput(dpy, win, ExposureMask | KeyPressMask | StructureNotifyMask);
-
-  wmDeleteMessage = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-  XSetWMProtocols(dpy, win, &wmDeleteMessage, 1);
-}
+static const int MAX_THREADS = 4;
 
 #define MAX_ITER    (1 << 14)
 static unsigned cols[MAX_ITER + 1];
@@ -164,10 +73,6 @@ struct thread_data
   float ymin, ymax;
 };
 
-static pthread_mutex_t x_lock = PTHREAD_MUTEX_INITIALIZER;
-
-static const int MAX_THREADS = 4;
-
 static void *thread_func(void *data)
 {
   thread_data *td = data;
@@ -190,14 +95,11 @@ static void *thread_func(void *data)
 
       counts = mandel_float_period(cr, ci);
 
-      ((unsigned *) bitmap->data)[x + y * td->size] = cols[counts];
+      ((unsigned *) x_image->data)[x + y * td->size] = cols[counts];
     }
 
     pthread_mutex_lock(&x_lock);
-
-    XPutImage(dpy, win, gc, bitmap,
-              0, y, 0, y,
-              td->size, 1);
+    x11_put_image(0, y, 0, y, td->size, 1);
     pthread_mutex_unlock(&x_lock);
   }
 
@@ -206,7 +108,7 @@ static void *thread_func(void *data)
   return NULL;
 }
 
-static void display_mandelbrot_set(int size, float xmin, float xmax, float ymin, float ymax)
+static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin, float ymax)
 {
   int i;
   thread_data *td;
@@ -236,54 +138,25 @@ static void display_mandelbrot_set(int size, float xmin, float xmax, float ymin,
 
   free(threads);
 
-  XFlush(dpy);
+  // TODO esse flush provavelmente sairá daqui
+  x11_flush();
 }
 
 int main(void) {
+  init_colours();
+
+  const int IMAGE_SIZE = 800;
+  x11_init(IMAGE_SIZE);
+
   double xmin = -2;
   double xmax = 1.0;
   double ymin = -1.5;
   double ymax = 1.5;
+  compute_mandelbrot_set(IMAGE_SIZE, xmin, xmax, ymin, ymax);
 
-  const int IMAGE_SIZE = 800;
+  x11_handle_events(IMAGE_SIZE);
 
-  init_x11(IMAGE_SIZE);
-
-  init_colours();
-
-  display_mandelbrot_set(IMAGE_SIZE, xmin, xmax, ymin, ymax);
-
-  while(1) {
-    XEvent event;
-    KeySym key;
-
-    XNextEvent(dpy, &event);
-
-    // redraw on expose (resize etc)
-    if ((event.type == Expose) && !event.xexpose.count) {
-      XPutImage(
-                dpy, win, gc, bitmap,
-                0, 0, 0, 0,
-                IMAGE_SIZE, IMAGE_SIZE
-                );
-    }
-
-    // esc to close
-    char key_buffer[128];
-    if (event.type == KeyPress) {
-      XLookupString(&event.xkey, key_buffer, sizeof key_buffer, &key, NULL);
-      if (key == XK_Escape) {
-        break;
-      }
-    }
-
-    // click on close window button
-    if ((event.type == ClientMessage) && ((Atom) event.xclient.data.l[0] == wmDeleteMessage)) {
-      break;
-    }
-  }
-
-  exit_x11();
+  x11_destroy();
 
   return 0;
 }
