@@ -184,13 +184,13 @@ static void *producer(void *data) {
     int height = result->yf - result->yi + 1;
     result->pixels = malloc(sizeof(unsigned) * (width * height));
 
-    for (int x = result->xi; x <= result->xf; x++) {
-      for (int y = result->yi; y <= result->yf; y++) {
+    for (int y = result->yi; y <= result->yf; y++) {
+      for (int x = result->xi; x <= result->xf; x++) {
         float c_real = xmin + (x * xscal);
         float c_imaginary = ymin + (y * yscal);
 
         int iterations = calculate_mandelbrot_iterations(c_real, c_imaginary);
-        int pixel_index = x + (y * width);
+        int pixel_index = (x - result->xi) + ((y - result->yi) * width);
         ((unsigned *) result->pixels)[pixel_index] = colors[iterations];
       }
     }
@@ -239,7 +239,6 @@ static void *consumer(void *data) {
 int main(void) {
   printf("p1\n");
 
-  //  pthread_mutex_init(&mutex, NULL);
   task_queue = queue_init(sizeof(task_data));
   result_queue = queue_init(sizeof(result_data));
 
