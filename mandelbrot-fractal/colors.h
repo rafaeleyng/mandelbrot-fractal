@@ -30,12 +30,9 @@ static int palette[] = {
 
 static void colors_init(int *colors, int length) {
   for (int i= 0; i < length - 1; i++) {
-    if (i < 16) {
-      colors[i] = palette[i];
-    } else {
-      colors[i] = 0;
-    }
+    colors[i] = palette[i % 16];
   }
 }
+
 
 #endif /* colors_h */

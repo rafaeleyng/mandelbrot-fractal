@@ -11,7 +11,7 @@
 
 static const int PRODUCER_THREADS = 8;
 // TODO aumentar
-static const int MAX_ITERATIONS = 24;
+static const int MAX_ITERATIONS = 1024;
 static int colors[MAX_ITERATIONS + 1] = {0};
 
 static queue *task_queue;
