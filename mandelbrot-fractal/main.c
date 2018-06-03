@@ -10,7 +10,6 @@
 #import "x11-helpers.h"
 
 static const int PRODUCER_THREADS = 8;
-// TODO aumentar
 static const int MAX_ITERATIONS = 1024;
 static int colors[MAX_ITERATIONS + 1] = {0};
 
@@ -23,8 +22,6 @@ float xmax = 1.5;
 float ymin = -2;
 float ymax = 2;
 const int IMAGE_SIZE = 800;
-const int grain_width = 100;
-const int grain_height = 100;
 
 typedef struct {
   int tasks;
@@ -78,6 +75,9 @@ static int calculate_mandelbrot_iterations(float cr, float ci) {
 }
 
 static int create_tasks(int image_width, int image_height) {
+  const int grain_width = 100;
+  const int grain_height = 100;
+
   const int horizontal_chunks = image_width / grain_width;
   const int vertical_chunks = image_height / grain_height;
 
@@ -108,7 +108,6 @@ static void *producer(void *data) {
   while (1) {
     pthread_mutex_lock(task_queue->mutex);
     if (task_queue->empty) {
-//      printf("tasks queue is empty, finishing producer thread\n");
       pthread_mutex_unlock(task_queue->mutex);
       break;
     }
@@ -137,8 +136,6 @@ static void *producer(void *data) {
       }
     }
 
-//    printf("producer: processed %d %d %d %d.\n", result->xi, result->xf, result->yi, result->yf);
-
     pthread_mutex_lock(result_queue->mutex);
     queue_push(result_queue, result);
     pthread_mutex_unlock(result_queue->mutex);
@@ -152,17 +149,14 @@ static void *consumer(void *data) {
   consumer_data *cd = (consumer_data *) data;
   int consumed_tasks = 0;
 
-//  printf("starting consumer thread, were created %d tasks\n", cd->tasks);
   while (1) {
     if (consumed_tasks == cd->tasks) {
-//      printf("consumer exiting\n");
       x11_flush();
       return NULL;
     }
 
     pthread_mutex_lock(result_queue->mutex);
     while (result_queue->empty) {
-//      printf("consumer: queue EMPTY.\n");
       pthread_cond_wait(result_queue->notEmpty, result_queue->mutex);
     }
 
@@ -171,7 +165,6 @@ static void *consumer(void *data) {
     x11_put_image(result->xi, result->yi, result->xi, result->yi, (result->xf - result->xi + 1), (result->yf - result->yi + 1));
     pthread_mutex_unlock(result_queue->mutex);
     pthread_cond_signal(result_queue->notFull); // TODO
-//    printf("consumer: processed %d %d %d %d.\n", result->xi, result->xf, result->yi, result->yf);
     consumed_tasks++;
   }
 }
@@ -205,65 +198,25 @@ void transform_coordinates(int xi_signal, int xf_signal, int yi_signal, int yf_s
   xmax += width * 0.1 * xf_signal;
   ymin += height * 0.1 * yi_signal;
   ymax += height * 0.1 * yf_signal;
-}
-
-void translate_coordinates(int x_signal, int y_signal) {
-  transform_coordinates(x_signal, x_signal, -y_signal, -y_signal);
-}
-
-void zoom_coordinates(int signal) {
-  transform_coordinates(signal, -signal, signal, -signal);
+  process_mandelbrot_set();
 }
 
 int main(void) {
+  // init
   x11_init(IMAGE_SIZE);
   colors_init(colors, MAX_ITERATIONS);
-
   task_queue = queue_init(sizeof(task_data));
   result_queue = queue_init(sizeof(result_data));
 
+  // compute
   process_mandelbrot_set();
 
-  while(1) {
-    XEvent event;
-    KeySym key;
+  // loop
+  x11_handle_events(IMAGE_SIZE, transform_coordinates);
 
-    XNextEvent(display, &event);
-
-    // redraw on expose (resize etc)
-    if ((event.type == Expose) && !event.xexpose.count) {
-      x11_put_image(0, 0, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
-    }
-
-    // esc to close
-    char key_buffer[128];
-    if (event.type == KeyPress) {
-      XLookupString(&event.xkey, key_buffer, sizeof key_buffer, &key, NULL);
-      
-      if (key == XK_Escape) {
-        break;
-      } else if (key == XK_Up) {
-        translate_coordinates(0, 1);
-        process_mandelbrot_set();
-      } else if (key == XK_Right) {
-        translate_coordinates(1, 0);
-        process_mandelbrot_set();
-      } else if (key == XK_Down) {
-        translate_coordinates(0, -1);
-        process_mandelbrot_set();
-      } else if (key == XK_Left) {
-        translate_coordinates(-1, 0);
-        process_mandelbrot_set();
-      } else if (key == XK_m || key == XK_M) {
-        zoom_coordinates(1);
-        process_mandelbrot_set();
-      } else if (key == XK_n || key == XK_N) {
-        zoom_coordinates(-1);
-        process_mandelbrot_set();
-      }
-    }
-  }
-
+  // cleanup
+  queue_destroy(task_queue);
+  queue_destroy(result_queue);
   x11_destroy();
 
   return 0;

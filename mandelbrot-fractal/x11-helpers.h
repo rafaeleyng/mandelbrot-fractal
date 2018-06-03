@@ -97,7 +97,7 @@ static void x11_flush() {
   XFlush(display);
 }
 
-static void x11_handle_events(int image_size) {
+static void x11_handle_events(int image_size, void (*transform_coordinates_cb)(int, int, int, int)) {
   while(1) {
     XEvent event;
     KeySym key;
@@ -113,8 +113,21 @@ static void x11_handle_events(int image_size) {
     char key_buffer[128];
     if (event.type == KeyPress) {
       XLookupString(&event.xkey, key_buffer, sizeof key_buffer, &key, NULL);
+
       if (key == XK_Escape) {
         break;
+      } else if (key == XK_Up) {
+        transform_coordinates_cb(0, 0, -1, -1);
+      } else if (key == XK_Right) {
+        transform_coordinates_cb(1, 1, 0, 0);
+      } else if (key == XK_Down) {
+        transform_coordinates_cb(0, 0, 1, 1);
+      } else if (key == XK_Left) {
+        transform_coordinates_cb(-1, -1, 0, 0);
+      } else if (key == XK_m || key == XK_M) {
+        transform_coordinates_cb(1, -1, 1, -1);
+      } else if (key == XK_n || key == XK_N) {
+        transform_coordinates_cb(-1, 1, -1, 1);
       }
     }
   }
