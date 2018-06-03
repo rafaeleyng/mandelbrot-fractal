@@ -6,6 +6,7 @@
 #import <err.h>
 
 #import "colors.h"
+//#import "queue.h"
 #import "x11-helpers.h"
 
 static pthread_mutex_t mutex;
@@ -13,6 +14,19 @@ static pthread_mutex_t mutex;
 static const int MAX_THREADS = 4;
 static const int MAX_ITERATIONS = 1024;
 static int colors[MAX_ITERATIONS] = {0};
+
+//queue *task_queue;
+//queue *result_queue;
+//
+//typedef struct {
+//  int size;
+//  int type;
+//} task_data;
+//
+//typedef struct {
+//  int size2;
+//  int type2;
+//} result_data;
 
 typedef struct thread_data thread_data;
 struct thread_data {
@@ -93,6 +107,15 @@ static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin,
 }
 
 int main(void) {
+//  task_queue = queue_init(sizeof(task_data));
+//
+//  task_data *taskData = malloc(sizeof(task_data));
+//  taskData->size = 1;
+//  taskData->type = 2;
+//  queue_push(task_queue, taskData);
+//  task_data *got1 = malloc(sizeof(task_data));
+//  queue_pop(task_queue, got1);
+
   pthread_mutex_init(&mutex, NULL);
 
   colors_init(colors, MAX_ITERATIONS);
