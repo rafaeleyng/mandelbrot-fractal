@@ -10,8 +10,8 @@
 #import "x11-helpers.h"
 
 static const int PRODUCER_THREADS = 8;
-static const int MAX_ITERATIONS = 1024;
-static int colors[MAX_ITERATIONS + 1] = {0};
+static const int ITERATION_LIMIT = 1024;
+static int colors[ITERATION_LIMIT + 1] = {0};
 
 static queue *task_queue;
 static queue *result_queue;
@@ -41,37 +41,40 @@ typedef struct {
   int yf;
 } result_data;
 
-static int calculate_mandelbrot_iterations(float cr, float ci) {
-  double zr = cr, zi = ci;
-  double tmp;
+static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
+  float z_real = c_real;
+  float z_imaginary = c_imaginary;
 
-  double ckr, cki;
+  float test_real, test_imaginary;
+  unsigned test_index = 0, test_limit = 8;
 
-  unsigned p = 0, ptot = 8;
+  do {
+    test_real = z_real;
+    test_imaginary = z_imaginary;
 
-  do
-  {
-    ckr = zr;
-    cki = zi;
-
-    ptot += ptot;
-    if (ptot > MAX_ITERATIONS) ptot = MAX_ITERATIONS;
-
-    for (; p < ptot; p++)
-    {
-      tmp = zr * zr - zi * zi + cr;
-      zi *= 2 * zr;
-      zi += ci;
-      zr = tmp;
-
-      if (zr * zr + zi * zi > 4.0) return p;
-
-      if ((zr == ckr) && (zi == cki)) return MAX_ITERATIONS;
+    test_limit += test_limit;
+    if (test_limit > ITERATION_LIMIT) {
+      test_limit = ITERATION_LIMIT;
     }
-  }
-  while (ptot != MAX_ITERATIONS);
 
-  return MAX_ITERATIONS;
+    for (; test_index < test_limit; test_index++) {
+      // FOIL
+      float temp_z_real = (z_real * z_real) - (z_imaginary * z_imaginary) + c_real;
+      z_imaginary = (2 * z_imaginary * z_real) + c_imaginary;
+      z_real = temp_z_real;
+
+      int diverged = (z_real * z_real) + (z_imaginary * z_imaginary) > 4.0;
+      if (diverged) {
+        return test_index;
+      }
+
+      if ((z_real == test_real) && (z_imaginary == test_imaginary)) {
+        return ITERATION_LIMIT;
+      }
+    }
+  } while (test_limit != ITERATION_LIMIT);
+
+  return ITERATION_LIMIT;
 }
 
 static int create_tasks(int image_width, int image_height) {
@@ -204,7 +207,7 @@ void transform_coordinates(int xi_signal, int xf_signal, int yi_signal, int yf_s
 int main(void) {
   // init
   x11_init(IMAGE_SIZE);
-  colors_init(colors, MAX_ITERATIONS);
+  colors_init(colors, ITERATION_LIMIT);
   task_queue = queue_init(sizeof(task_data));
   result_queue = queue_init(sizeof(result_data));
 
