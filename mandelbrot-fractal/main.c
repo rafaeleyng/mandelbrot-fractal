@@ -17,37 +17,33 @@ static int colors[MAX_ITERATIONS] = {0};
 
 //queue *task_queue;
 //queue *result_queue;
-//
-//typedef struct {
-//  int size;
-//  int type;
-//} task_data;
-//
+
+typedef struct {
+  int size;
+  int num;
+  float xmin, xmax;
+  float ymin, ymax;
+} task_data;
+
 //typedef struct {
 //  int size2;
 //  int type2;
 //} result_data;
 
-typedef struct thread_data thread_data;
-struct thread_data {
-  int size;
-  int num;
-  float xmin, xmax;
-  float ymin, ymax;
-};
-
-static int mandel_float(float cr, float ci) {
-  float zr = cr, zi = ci;
+static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
+  float z_real = c_real;
+  float z_imaginary = c_imaginary;
 
   int i;
+  // (- 1) porque queremos que i chegue no máximo à última posição do array no valor de retorno
   for (i = 0; i < MAX_ITERATIONS - 1; i++) {
-    float tmp;
-    tmp = zr * zr - zi * zi + cr;
-    zi *= 2 * zr;
-    zi += ci;
-    zr = tmp;
+    // FOIL
+    float temp_z_real = (z_real * z_real) - (z_imaginary * z_imaginary) + c_real;
+    z_imaginary = (2 * z_imaginary * z_real) + c_imaginary;
+    z_real = temp_z_real;
 
-    if (zr * zr + zi * zi > 4.0) {
+    int diverged = (z_real * z_real) + (z_imaginary * z_imaginary) > 4.0;
+    if (diverged) {
       break;
     }
   }
@@ -56,18 +52,22 @@ static int mandel_float(float cr, float ci) {
 }
 
 static void *producer(void *data) {
-  thread_data *td = data;
+  task_data *td = data;
 
+  // qual o tamanho ocupado por um pixel, na escala do plano
   float xscal = (td->xmax - td->xmin) / td->size;
   float yscal = (td->ymax - td->ymin) / td->size;
 
+  // itera intercalando as linhas nas threads. Uma vai pegar (0, 4, 8, ...), outra vai pegar (1, 5, 9, ...)
   for (int y = td->num; y < td->size; y += MAX_THREADS) {
+    // itera colunas
     for (int x = 0; x < td->size; x++) {
-      float cr = td->xmin + x * xscal;
-      float ci = td->ymin + y * yscal;
+      float c_real = td->xmin + (x * xscal);
+      float c_imaginary = td->ymin + (y * yscal);
 
-      int counts = mandel_float(cr, ci);
-      ((unsigned *) x_image->data)[x + y * td->size] = colors[counts];
+      int iterations = calculate_mandelbrot_iterations(c_real, c_imaginary);
+      int pixel_index = x + y * td->size;
+      ((unsigned *) x_image->data)[pixel_index] = colors[iterations];
     }
 
     pthread_mutex_lock(&mutex);
@@ -80,13 +80,14 @@ static void *producer(void *data) {
   return NULL;
 }
 
-static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin, float ymax) {
-  pthread_t *threads = malloc(sizeof(pthread_t) * MAX_THREADS);
+static void compute_mandelbrot_set(int image_size, float xmin, float xmax, float ymin, float ymax) {
+  pthread_t threads[MAX_THREADS];
 
+  // para cada thread, gera uma tarefa
   for (int i = 0; i < MAX_THREADS; i++) {
-    thread_data *td = malloc(sizeof(thread_data));
+    task_data *td = malloc(sizeof(task_data));
 
-    td->size = size;
+    td->size = image_size;
     td->num = i;
     td->xmin = xmin;
     td->xmax = xmax;
@@ -99,8 +100,6 @@ static void compute_mandelbrot_set(int size, float xmin, float xmax, float ymin,
   for (int i = 0; i < MAX_THREADS; i++) {
     pthread_join(threads[i], NULL);
   }
-
-  free(threads);
 
   // TODO esse flush provavelmente sairá daqui
   x11_flush();
@@ -123,10 +122,10 @@ int main(void) {
   const int IMAGE_SIZE = 800;
   x11_init(IMAGE_SIZE);
 
-  double xmin = -2;
-  double xmax = 1.0;
-  double ymin = -1.5;
-  double ymax = 1.5;
+  double xmin = -2.5;
+  double xmax = 1.5;
+  double ymin = -2;
+  double ymax = 2;
   compute_mandelbrot_set(IMAGE_SIZE, xmin, xmax, ymin, ymax);
 
   x11_handle_events(IMAGE_SIZE);
