@@ -11,17 +11,17 @@
 
 static const int PRODUCER_THREADS = 8;
 // TODO aumentar
-static const int MAX_ITERATIONS = 1024;
+static const int MAX_ITERATIONS = 24;
 static int colors[MAX_ITERATIONS + 1] = {0};
 
 static queue *task_queue;
 static queue *result_queue;
 
 // TODO
-const float xmin = -2.5;
-const float xmax = 1.5;
-const float ymin = -2;
-const float ymax = 2;
+float xmin = -2.5;
+float xmax = 1.5;
+float ymin = -2;
+float ymax = 2;
 const int IMAGE_SIZE = 800;
 const int grain_width = 100;
 const int grain_height = 100;
@@ -163,13 +163,7 @@ static void *consumer(void *data) {
   }
 }
 
-int main(void) {
-  x11_init(IMAGE_SIZE);
-  colors_init(colors, MAX_ITERATIONS);
-
-  task_queue = queue_init(sizeof(task_data));
-  result_queue = queue_init(sizeof(result_data));
-
+void process_mandelbrot_set() {
   int tasks_created = create_tasks(IMAGE_SIZE, IMAGE_SIZE);
 
   pthread_t producer_threads[PRODUCER_THREADS];
@@ -189,8 +183,72 @@ int main(void) {
 
   pthread_join(consumer_thread, NULL);
   free(cd);
+}
 
-  x11_handle_events(IMAGE_SIZE);
+void translate_coordinates(float x, float y) {
+  xmin += x;
+  xmax += x;
+  ymin -= y;
+  ymax -= y;
+}
+
+void zoom_coordinates(int signal) {
+  float width = xmax - xmin;
+  float height = ymax - ymin;
+  xmin = xmin + (width * 0.1 * signal);
+  xmax = xmax - (width * 0.1 * signal);
+  ymin = ymin + (height * 0.1 * signal);
+  ymax = ymax - (height * 0.1 * signal);
+}
+
+int main(void) {
+  x11_init(IMAGE_SIZE);
+  colors_init(colors, MAX_ITERATIONS);
+
+  task_queue = queue_init(sizeof(task_data));
+  result_queue = queue_init(sizeof(result_data));
+
+  process_mandelbrot_set();
+
+  while(1) {
+    XEvent event;
+    KeySym key;
+
+    XNextEvent(display, &event);
+
+    // redraw on expose (resize etc)
+    if ((event.type == Expose) && !event.xexpose.count) {
+      x11_put_image(0, 0, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
+    }
+
+    // esc to close
+    char key_buffer[128];
+    if (event.type == KeyPress) {
+      XLookupString(&event.xkey, key_buffer, sizeof key_buffer, &key, NULL);
+      
+      if (key == XK_Escape) {
+        break;
+      } else if (key == XK_Up) {
+        translate_coordinates(0, 0.1);
+        process_mandelbrot_set();
+      } else if (key == XK_Right) {
+        translate_coordinates(0.1, 0);
+        process_mandelbrot_set();
+      } else if (key == XK_Down) {
+        translate_coordinates(0, -0.1);
+        process_mandelbrot_set();
+      } else if (key == XK_Left) {
+        translate_coordinates(-0.1, 0);
+        process_mandelbrot_set();
+      } else if (key == XK_m || key == XK_M) {
+        zoom_coordinates(1);
+        process_mandelbrot_set();
+      } else if (key == XK_n || key == XK_N) {
+        zoom_coordinates(-1);
+        process_mandelbrot_set();
+      }
+    }
+  }
 
   x11_destroy();
 

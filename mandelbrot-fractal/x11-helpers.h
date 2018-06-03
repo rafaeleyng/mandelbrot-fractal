@@ -118,7 +118,6 @@ static void x11_handle_events(int image_size) {
       }
     }
   }
-
 }
 
 #endif /* x11_h */
