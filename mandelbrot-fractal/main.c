@@ -78,8 +78,8 @@ static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
 }
 
 static int create_tasks(int image_width, int image_height) {
-  const int grain_width = 100;
-  const int grain_height = 100;
+  const int grain_width = 50;
+  const int grain_height = 50;
 
   const int horizontal_chunks = image_width / grain_width;
   const int vertical_chunks = image_height / grain_height;
@@ -140,6 +140,9 @@ static void *producer(void *data) {
     }
 
     pthread_mutex_lock(result_queue->mutex);
+    while (result_queue->full) {
+      pthread_cond_wait(result_queue->notFull, result_queue->mutex);
+    }
     queue_push(result_queue, result);
     pthread_mutex_unlock(result_queue->mutex);
     pthread_cond_signal(result_queue->notEmpty);
@@ -167,7 +170,7 @@ static void *consumer(void *data) {
     queue_pop(result_queue, result);
     x11_put_image(result->xi, result->yi, result->xi, result->yi, (result->xf - result->xi + 1), (result->yf - result->yi + 1));
     pthread_mutex_unlock(result_queue->mutex);
-    pthread_cond_signal(result_queue->notFull); // TODO
+    pthread_cond_signal(result_queue->notFull);
     consumed_tasks++;
   }
 }
@@ -208,8 +211,8 @@ int main(void) {
   // init
   x11_init(IMAGE_SIZE);
   colors_init(colors, ITERATION_LIMIT);
-  task_queue = queue_init(sizeof(task_data));
-  result_queue = queue_init(sizeof(result_data));
+  task_queue = queue_init(300, sizeof(task_data));
+  result_queue = queue_init(10, sizeof(result_data));
 
   // compute
   process_mandelbrot_set();
