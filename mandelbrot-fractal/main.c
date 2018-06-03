@@ -18,17 +18,13 @@ static queue *task_queue;
 static queue *result_queue;
 
 // TODO
-const double xmin = -2.5;
-const double xmax = 1.5;
-const double ymin = -2;
-const double ymax = 2;
+const float xmin = -2.5;
+const float xmax = 1.5;
+const float ymin = -2;
+const float ymax = 2;
 const int IMAGE_SIZE = 800;
 const int grain_width = 100;
 const int grain_height = 100;
-
-// qual o tamanho ocupado por um pixel, na escala do plano
-const float xscal = (xmax - xmin) / IMAGE_SIZE;
-const float yscal = (ymax - ymin) / IMAGE_SIZE;
 
 typedef struct {
   int tasks;
@@ -114,11 +110,14 @@ static void *producer(void *data) {
     result->yf = task->yf;
     free(task);
 
+    // qual o tamanho ocupado por um pixel, na escala do plano
+    const float pixel_width = (xmax - xmin) / IMAGE_SIZE;
+    const float pixel_height = (ymax - ymin) / IMAGE_SIZE;
+
     for (int y = result->yi; y <= result->yf; y++) {
       for (int x = result->xi; x <= result->xf; x++) {
-        float c_real = xmin + (x * xscal);
-        float c_imaginary = ymin + (y * yscal);
-
+        float c_real = xmin + (x * pixel_width);
+        float c_imaginary = ymin + (y * pixel_height);
         int iterations = calculate_mandelbrot_iterations(c_real, c_imaginary);
         int pixel_index = x + (y * IMAGE_SIZE);
         ((unsigned *) x_image->data)[pixel_index] = colors[iterations];

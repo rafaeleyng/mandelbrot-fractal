@@ -11,6 +11,7 @@
 
 #import <string.h>
 
+// TODO
 #define QUEUESIZE 100
 
 typedef struct {
@@ -43,6 +44,7 @@ queue *queue_init (size_t memSize) {
   return (q);
 }
 
+// TODO
 void queue_destroy (queue *q) {
   pthread_mutex_destroy (q->mutex);
   free (q->mutex);
