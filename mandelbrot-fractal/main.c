@@ -9,9 +9,6 @@
 #import "queue.h"
 #import "x11-helpers.h"
 
-//static pthread_mutex_t mutex;
-
-//static const int MAX_THREADS = 4;
 static const int PRODUCER_THREADS = 4;
 // TODO aumentar
 static const int MAX_ITERATIONS = 1024;
@@ -26,19 +23,12 @@ const double xmax = 1.5;
 const double ymin = -2;
 const double ymax = 2;
 const int IMAGE_SIZE = 800;
-const int grain_width = 400;
-const int grain_height = 400;
+const int grain_width = 100;
+const int grain_height = 100;
 
 // qual o tamanho ocupado por um pixel, na escala do plano
 const float xscal = (xmax - xmin) / IMAGE_SIZE;
 const float yscal = (ymax - ymin) / IMAGE_SIZE;
-
-//typedef struct {
-//  int size;
-//  int num;
-//  float xmin, xmax;
-//  float ymin, ymax;
-//} thread_data;
 
 typedef struct {
   int tasks;
@@ -56,7 +46,6 @@ typedef struct {
   int xf;
   int yi;
   int yf;
-  unsigned *pixels;
 } result_data;
 
 static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
@@ -79,60 +68,6 @@ static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
 
   return i;
 }
-
-//static void *producer_old(void *data) {
-//  thread_data *td = data;
-//
-//  // qual o tamanho ocupado por um pixel, na escala do plano
-//  float xscal = (td->xmax - td->xmin) / td->size;
-//  float yscal = (td->ymax - td->ymin) / td->size;
-//
-//  // itera intercalando as linhas nas threads. Uma vai pegar (0, 4, 8, ...), outra vai pegar (1, 5, 9, ...)
-//  for (int y = td->num; y < td->size; y += MAX_THREADS) {
-//    // itera colunas
-//    for (int x = 0; x < td->size; x++) {
-//      float c_real = td->xmin + (x * xscal);
-//      float c_imaginary = td->ymin + (y * yscal);
-//
-//      int iterations = calculate_mandelbrot_iterations(c_real, c_imaginary);
-//      int pixel_index = x + y * td->size;
-//      ((unsigned *) x_image->data)[pixel_index] = colors[iterations];
-//    }
-//
-//    pthread_mutex_lock(&mutex);
-//    x11_put_image(0, y, 0, y, td->size, 1);
-//    pthread_mutex_unlock(&mutex);
-//  }
-//
-//  free(td);
-//
-//  return NULL;
-//}
-//
-//static void compute_mandelbrot_set(int image_size, float xmin, float xmax, float ymin, float ymax) {
-//  pthread_t threads[MAX_THREADS];
-//
-//  // para cada thread, gera uma tarefa
-//  for (int i = 0; i < MAX_THREADS; i++) {
-//    thread_data *td = malloc(sizeof(thread_data));
-//
-//    td->size = image_size;
-//    td->num = i;
-//    td->xmin = xmin;
-//    td->xmax = xmax;
-//    td->ymin = ymin;
-//    td->ymax = ymax;
-//
-//    pthread_create(&threads[i], NULL, producer_old, td);
-//  }
-//
-//  for (int i = 0; i < MAX_THREADS; i++) {
-//    pthread_join(threads[i], NULL);
-//  }
-//
-//  // TODO esse flush provavelmente sairá daqui
-//  x11_flush();
-//}
 
 static int create_tasks(int image_width, int image_height) {
   const int horizontal_chunks = image_width / grain_width;
@@ -165,7 +100,7 @@ static void *producer(void *data) {
   while (1) {
     pthread_mutex_lock(task_queue->mutex);
     if (task_queue->empty) {
-      printf("tasks queue is empty, finishing producer thread\n");
+//      printf("tasks queue is empty, finishing producer thread\n");
       pthread_mutex_unlock(task_queue->mutex);
       break;
     }
@@ -180,22 +115,18 @@ static void *producer(void *data) {
     result->yf = task->yf;
     free(task);
 
-    int width = result->xf - result->xi + 1;
-    int height = result->yf - result->yi + 1;
-    result->pixels = malloc(sizeof(unsigned) * (width * height));
-
     for (int y = result->yi; y <= result->yf; y++) {
       for (int x = result->xi; x <= result->xf; x++) {
         float c_real = xmin + (x * xscal);
         float c_imaginary = ymin + (y * yscal);
 
         int iterations = calculate_mandelbrot_iterations(c_real, c_imaginary);
-        int pixel_index = (x - result->xi) + ((y - result->yi) * width);
-        ((unsigned *) result->pixels)[pixel_index] = colors[iterations];
+        int pixel_index = x + (y * IMAGE_SIZE);
+        ((unsigned *) x_image->data)[pixel_index] = colors[iterations];
       }
     }
 
-    printf("producer: processed %d %d %d %d.\n", result->xi, result->xf, result->yi, result->yf);
+//    printf("producer: processed %d %d %d %d.\n", result->xi, result->xf, result->yi, result->yf);
 
     pthread_mutex_lock(result_queue->mutex);
     queue_push(result_queue, result);
@@ -210,34 +141,33 @@ static void *consumer(void *data) {
   consumer_data *cd = (consumer_data *) data;
   int consumed_tasks = 0;
 
-  printf("starting consumer thread, were created %d tasks\n", cd->tasks);
+//  printf("starting consumer thread, were created %d tasks\n", cd->tasks);
   while (1) {
     if (consumed_tasks == cd->tasks) {
-      printf("consumer exiting\n");
+//      printf("consumer exiting\n");
+      x11_flush();
       return NULL;
     }
 
     pthread_mutex_lock(result_queue->mutex);
     while (result_queue->empty) {
-      printf("consumer: queue EMPTY.\n");
+//      printf("consumer: queue EMPTY.\n");
       pthread_cond_wait(result_queue->notEmpty, result_queue->mutex);
     }
 
     result_data *result = malloc(sizeof(result_data));
     queue_pop(result_queue, result);
-    // TODO
-    //  x11_put_image(0, y, 0, y, td->size, 1);
+    x11_put_image(result->xi, result->yi, result->xi, result->yi, (result->xf - result->xi + 1), (result->yf - result->yi + 1));
     pthread_mutex_unlock(result_queue->mutex);
     pthread_cond_signal(result_queue->notFull); // TODO
-    printf("consumer: processed %d %d %d %d.\n", result->xi, result->xf, result->yi, result->yf);
+//    printf("consumer: processed %d %d %d %d.\n", result->xi, result->xf, result->yi, result->yf);
     consumed_tasks++;
   }
-
-  return NULL;
 }
 
 int main(void) {
-  printf("p1\n");
+  x11_init(IMAGE_SIZE);
+  colors_init(colors, MAX_ITERATIONS);
 
   task_queue = queue_init(sizeof(task_data));
   result_queue = queue_init(sizeof(result_data));
@@ -251,8 +181,6 @@ int main(void) {
     pthread_create(&producer_threads[i], NULL, producer, NULL);
   }
 
-  printf("p2\n");
-
   consumer_data *cd = malloc(sizeof(consumer_data));
   cd->tasks = tasks_created;
   pthread_create(&consumer_thread, NULL, consumer, cd);
@@ -264,28 +192,9 @@ int main(void) {
   pthread_join(consumer_thread, NULL);
   free(cd);
 
-  printf("p3\n");
+  x11_handle_events(IMAGE_SIZE);
 
-//  // TODO esse flush provavelmente sairá daqui
-//  x11_flush();
-
-//  task_data *task = malloc(sizeof(task_data));
-//  queue_pop(task_queue, task);
-
-//
-//  colors_init(colors, MAX_ITERATIONS);
-//
-//  x11_init(IMAGE_SIZE);
-//
-//  double xmin = -2.5;
-//  double xmax = 1.5;
-//  double ymin = -2;
-//  double ymax = 2;
-//  compute_mandelbrot_set(IMAGE_SIZE, xmin, xmax, ymin, ymax);
-//
-//  x11_handle_events(IMAGE_SIZE);
-//
-//  x11_destroy();
+  x11_destroy();
 
   return 0;
 }
