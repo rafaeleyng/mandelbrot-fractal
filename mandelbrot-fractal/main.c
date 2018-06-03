@@ -9,10 +9,10 @@
 #import "queue.h"
 #import "x11-helpers.h"
 
-static const int PRODUCER_THREADS = 4;
+static const int PRODUCER_THREADS = 8;
 // TODO aumentar
 static const int MAX_ITERATIONS = 1024;
-static int colors[MAX_ITERATIONS] = {0};
+static int colors[MAX_ITERATIONS + 1] = {0};
 
 static queue *task_queue;
 static queue *result_queue;
@@ -53,8 +53,7 @@ static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
   float z_imaginary = c_imaginary;
 
   int i;
-  // (- 1) porque queremos que i chegue no máximo à última posição do array no valor de retorno
-  for (i = 0; i < MAX_ITERATIONS - 1; i++) {
+  for (i = 0; i < MAX_ITERATIONS; i++) {
     // FOIL
     float temp_z_real = (z_real * z_real) - (z_imaginary * z_imaginary) + c_real;
     z_imaginary = (2 * z_imaginary * z_real) + c_imaginary;
@@ -75,8 +74,8 @@ static int create_tasks(int image_width, int image_height) {
 
   int tasks_created = 0;
 
-  for(int i = 0; i < horizontal_chunks; i++) {
-    for(int j = 0; j < vertical_chunks; j++) {
+  for(int j = 0; j < vertical_chunks; j++) {
+    for(int i = 0; i < horizontal_chunks; i++) {
       int xi = i * grain_width;
       int xf = ((i + 1) * grain_width) - 1;
 

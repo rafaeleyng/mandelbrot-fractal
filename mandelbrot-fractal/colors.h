@@ -18,7 +18,7 @@ static void colors_init(int *colors, int length) {
   }
 
   // last color is black
-  colors[length - 1] = 0;
+  colors[length] = 0;
 }
 
 #endif /* colors_h */
