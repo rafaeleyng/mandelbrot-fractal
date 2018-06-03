@@ -44,24 +44,37 @@ typedef struct {
   int yf;
 } result_data;
 
-static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
-  float z_real = c_real;
-  float z_imaginary = c_imaginary;
+static int calculate_mandelbrot_iterations(float cr, float ci) {
+  double zr = cr, zi = ci;
+  double tmp;
 
-  int i;
-  for (i = 0; i < MAX_ITERATIONS; i++) {
-    // FOIL
-    float temp_z_real = (z_real * z_real) - (z_imaginary * z_imaginary) + c_real;
-    z_imaginary = (2 * z_imaginary * z_real) + c_imaginary;
-    z_real = temp_z_real;
+  double ckr, cki;
 
-    int diverged = (z_real * z_real) + (z_imaginary * z_imaginary) > 4.0;
-    if (diverged) {
-      break;
+  unsigned p = 0, ptot = 8;
+
+  do
+  {
+    ckr = zr;
+    cki = zi;
+
+    ptot += ptot;
+    if (ptot > MAX_ITERATIONS) ptot = MAX_ITERATIONS;
+
+    for (; p < ptot; p++)
+    {
+      tmp = zr * zr - zi * zi + cr;
+      zi *= 2 * zr;
+      zi += ci;
+      zr = tmp;
+
+      if (zr * zr + zi * zi > 4.0) return p;
+
+      if ((zr == ckr) && (zi == cki)) return MAX_ITERATIONS;
     }
   }
+  while (ptot != MAX_ITERATIONS);
 
-  return i;
+  return MAX_ITERATIONS;
 }
 
 static int create_tasks(int image_width, int image_height) {
@@ -185,20 +198,21 @@ void process_mandelbrot_set() {
   free(cd);
 }
 
-void translate_coordinates(float x, float y) {
-  xmin += x;
-  xmax += x;
-  ymin -= y;
-  ymax -= y;
+void transform_coordinates(int xi_signal, int xf_signal, int yi_signal, int yf_signal) {
+  float width = xmax - xmin;
+  float height = ymax - ymin;
+  xmin += width * 0.1 * xi_signal;
+  xmax += width * 0.1 * xf_signal;
+  ymin += height * 0.1 * yi_signal;
+  ymax += height * 0.1 * yf_signal;
+}
+
+void translate_coordinates(int x_signal, int y_signal) {
+  transform_coordinates(x_signal, x_signal, -y_signal, -y_signal);
 }
 
 void zoom_coordinates(int signal) {
-  float width = xmax - xmin;
-  float height = ymax - ymin;
-  xmin = xmin + (width * 0.1 * signal);
-  xmax = xmax - (width * 0.1 * signal);
-  ymin = ymin + (height * 0.1 * signal);
-  ymax = ymax - (height * 0.1 * signal);
+  transform_coordinates(signal, -signal, signal, -signal);
 }
 
 int main(void) {
@@ -229,16 +243,16 @@ int main(void) {
       if (key == XK_Escape) {
         break;
       } else if (key == XK_Up) {
-        translate_coordinates(0, 0.1);
+        translate_coordinates(0, 1);
         process_mandelbrot_set();
       } else if (key == XK_Right) {
-        translate_coordinates(0.1, 0);
+        translate_coordinates(1, 0);
         process_mandelbrot_set();
       } else if (key == XK_Down) {
-        translate_coordinates(0, -0.1);
+        translate_coordinates(0, -1);
         process_mandelbrot_set();
       } else if (key == XK_Left) {
-        translate_coordinates(-0.1, 0);
+        translate_coordinates(-1, 0);
         process_mandelbrot_set();
       } else if (key == XK_m || key == XK_M) {
         zoom_coordinates(1);
