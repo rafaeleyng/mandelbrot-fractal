@@ -9,16 +9,30 @@
 #ifndef colors_h
 #define colors_h
 
+static int palette[] = {
+  4333071,
+  1640218,
+  590127,
+  263241,
+  1892,
+  797834,
+  1594033,
+  3767761,
+  8828389,
+  13888760,
+  15854015,
+  16304479,
+  16755200,
+  13402112,
+  10049280,
+  6960131
+};
+
 static void colors_init(int *colors, int length) {
   for (int i= 0; i < length - 1; i++) {
-    int r = rand();
-    int g = rand();
-    int b = rand();
-    colors[i] = (r << 16) + (g << 8) + b;
+    colors[i] = palette[i % 16];
   }
-
-  // last color is black
-  colors[length - 1] = 0;
 }
+
 
 #endif /* colors_h */
