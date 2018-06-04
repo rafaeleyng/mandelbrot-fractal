@@ -15,7 +15,7 @@ typedef struct {
   int size;
   void** data;
   size_t item_size;
-  long head, tail;
+  int head, tail;
   int is_full, is_empty;
   pthread_mutex_t *mutex;
   pthread_cond_t *condition_not_full, *condition_not_empty;

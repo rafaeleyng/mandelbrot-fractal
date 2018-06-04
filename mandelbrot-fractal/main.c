@@ -9,8 +9,8 @@
 #import "queue.h"
 #import "x11-helpers.h"
 
-static const int PRODUCER_THREADS = 1;
-static const int ITERATION_LIMIT = 1024 * 10;
+static const int PRODUCER_THREADS = 8;
+static const int ITERATION_LIMIT = 1024;
 static int colors[ITERATION_LIMIT + 1] = {0};
 
 static queue *task_queue;
@@ -78,8 +78,8 @@ static int calculate_mandelbrot_iterations(float c_real, float c_imaginary) {
 }
 
 static int create_tasks(int image_width, int image_height) {
-  const int grain_width = 50;
-  const int grain_height = 50;
+  const int grain_width = 100;
+  const int grain_height = 100;
 
   const int horizontal_chunks = image_width / grain_width;
   const int vertical_chunks = image_height / grain_height;
@@ -211,8 +211,8 @@ int main(void) {
   // init
   x11_init(IMAGE_SIZE);
   colors_init(colors, ITERATION_LIMIT);
-  task_queue = queue_init(300, sizeof(task_data));
-  result_queue = queue_init(10, sizeof(result_data));
+  task_queue = queue_init(100, sizeof(task_data));
+  result_queue = queue_init(100, sizeof(result_data));
 
   // compute
   process_mandelbrot_set();
