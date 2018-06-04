@@ -16,11 +16,10 @@ static int colors[ITERATION_LIMIT + 1] = {0};
 static queue *task_queue;
 static queue *result_queue;
 
-// TODO
-float xmin = -2.5;
-float xmax = 1.5;
-float ymin = -2;
-float ymax = 2;
+float coordinates_xi = -2.5;
+float coordinates_xf = 1.5;
+float coordinates_yi = -2;
+float coordinates_yf = 2;
 const int IMAGE_SIZE = 800;
 
 typedef struct {
@@ -126,13 +125,13 @@ static void *producer(void *data) {
     free(task);
 
     // qual o tamanho ocupado por um pixel, na escala do plano
-    const float pixel_width = (xmax - xmin) / IMAGE_SIZE;
-    const float pixel_height = (ymax - ymin) / IMAGE_SIZE;
+    const float pixel_width = (coordinates_xf - coordinates_xi) / IMAGE_SIZE;
+    const float pixel_height = (coordinates_yf - coordinates_yi) / IMAGE_SIZE;
 
     for (int y = result->yi; y <= result->yf; y++) {
       for (int x = result->xi; x <= result->xf; x++) {
-        float c_real = xmin + (x * pixel_width);
-        float c_imaginary = ymin + (y * pixel_height);
+        float c_real = coordinates_xi + (x * pixel_width);
+        float c_imaginary = coordinates_yi + (y * pixel_height);
         int iterations = calculate_mandelbrot_iterations(c_real, c_imaginary);
         int pixel_index = x + (y * IMAGE_SIZE);
         ((unsigned *) x_image->data)[pixel_index] = colors[iterations];
@@ -198,16 +197,23 @@ void process_mandelbrot_set() {
 }
 
 void transform_coordinates(int xi_signal, int xf_signal, int yi_signal, int yf_signal) {
-  float width = xmax - xmin;
-  float height = ymax - ymin;
-  xmin += width * 0.1 * xi_signal;
-  xmax += width * 0.1 * xf_signal;
-  ymin += height * 0.1 * yi_signal;
-  ymax += height * 0.1 * yf_signal;
+  float width = coordinates_xf - coordinates_xi;
+  float height = coordinates_yf - coordinates_yi;
+  coordinates_xi += width * 0.1 * xi_signal;
+  coordinates_xf += width * 0.1 * xf_signal;
+  coordinates_yi += height * 0.1 * yi_signal;
+  coordinates_yf += height * 0.1 * yf_signal;
   process_mandelbrot_set();
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
+  if (argc == 5) {
+    coordinates_xi = atof(argv[1]);
+    coordinates_xf = atof(argv[2]);
+    coordinates_yi = atof(argv[3]);
+    coordinates_yf = atof(argv[4]);
+  }
+
   // init
   x11_init(IMAGE_SIZE);
   colors_init(colors, ITERATION_LIMIT);
