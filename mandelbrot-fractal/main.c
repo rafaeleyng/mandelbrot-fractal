@@ -9,8 +9,8 @@
 #import "queue.h"
 #import "x11-helpers.h"
 
-static const int PRODUCER_THREADS = 8;
-static const int ITERATION_LIMIT = 1024;
+static const int PRODUCER_THREADS = 1;
+static const int ITERATION_LIMIT = 1024 * 10;
 static int colors[ITERATION_LIMIT + 1] = {0};
 
 static queue *task_queue;
@@ -110,7 +110,7 @@ static int create_tasks(int image_width, int image_height) {
 static void *producer(void *data) {
   while (1) {
     pthread_mutex_lock(task_queue->mutex);
-    if (task_queue->empty) {
+    if (task_queue->is_empty) {
       pthread_mutex_unlock(task_queue->mutex);
       break;
     }
@@ -140,12 +140,12 @@ static void *producer(void *data) {
     }
 
     pthread_mutex_lock(result_queue->mutex);
-    while (result_queue->full) {
-      pthread_cond_wait(result_queue->notFull, result_queue->mutex);
+    while (result_queue->is_full) {
+      pthread_cond_wait(result_queue->condition_not_full, result_queue->mutex);
     }
     queue_push(result_queue, result);
     pthread_mutex_unlock(result_queue->mutex);
-    pthread_cond_signal(result_queue->notEmpty);
+    pthread_cond_signal(result_queue->condition_not_empty);
   }
 
   return NULL;
@@ -162,15 +162,15 @@ static void *consumer(void *data) {
     }
 
     pthread_mutex_lock(result_queue->mutex);
-    while (result_queue->empty) {
-      pthread_cond_wait(result_queue->notEmpty, result_queue->mutex);
+    while (result_queue->is_empty) {
+      pthread_cond_wait(result_queue->condition_not_empty, result_queue->mutex);
     }
 
     result_data *result = malloc(sizeof(result_data));
     queue_pop(result_queue, result);
     x11_put_image(result->xi, result->yi, result->xi, result->yi, (result->xf - result->xi + 1), (result->yf - result->yi + 1));
     pthread_mutex_unlock(result_queue->mutex);
-    pthread_cond_signal(result_queue->notFull);
+    pthread_cond_signal(result_queue->condition_not_full);
     consumed_tasks++;
   }
 }

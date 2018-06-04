@@ -14,49 +14,10 @@
 
 static Display *display;
 static Window window;
-static XImage *x_image;
 static GC gc;
+static XImage *x_image;
 
-static void x11_init(int image_size) {
-  int bytes_per_pixel;
-
-  /* Attempt to open the display */
-  display = XOpenDisplay(NULL);
-
-  /* Failure */
-  if (!display) exit(0);
-
-  long white = WhitePixel(display, DefaultScreen(display));
-  long black = BlackPixel(display, DefaultScreen(display));
-
-  window = XCreateSimpleWindow(display,
-                            DefaultRootWindow(display),
-                            0, 0,
-                            image_size, image_size,
-                            0, black,
-                            white);
-
-  /* We want to be notified when the window appears */
-  XSelectInput(display, window, StructureNotifyMask);
-
-  /* Make it appear */
-  XMapWindow(display, window);
-
-  while (1) {
-    XEvent e;
-    XNextEvent(display, &e);
-    if (e.type == MapNotify) break;
-  }
-
-  XTextProperty tp;
-  char name[128] = "Mandelbrot set with pthreads";
-  char *n = name;
-  Status st = XStringListToTextProperty(&n, 1, &tp);
-  if (st) XSetWMName(display, window, &tp);
-
-  /* Wait for the MapNotify event */
-  XFlush(display);
-
+static void x11_init_image(int image_size) {
   int ii, jj;
   int depth = DefaultDepth(display, DefaultScreen(display));
   Visual *visual = DefaultVisual(display, DefaultScreen(display));
@@ -66,24 +27,46 @@ static void x11_init(int image_size) {
   ii = 1;
   jj = (depth - 1) >> 2;
   while (jj >>= 1) ii <<= 1;
-
   /* Pad the scanline to a multiple of 4 bytes */
   total = image_size * ii;
   total = (total + 3) & ~3;
   total *= image_size;
-  bytes_per_pixel = ii;
 
-  x_image = XCreateImage(display, visual, depth,
-                        ZPixmap, 0, malloc(total),
-                        image_size, image_size, 32, 0);
+  x_image = XCreateImage(display, visual, depth, ZPixmap, 0, malloc(total), image_size, image_size, 32, 0);
+}
 
+static void x11_init(int image_size) {
+  display = XOpenDisplay(NULL);
+  window = XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, image_size, image_size, 0, BlackPixel(display, DefaultScreen(display)),
+    WhitePixel(display, DefaultScreen(display)));
+
+  XSelectInput(display, window, StructureNotifyMask);
+  XMapWindow(display, window);
+
+  // sem isso alguns quadrados ficam brancos até que o flush aconteça
+  while (1) {
+    XEvent e;
+    XNextEvent(display, &e);
+    if (e.type == MapNotify) {
+      break;
+    }
+  }
+
+  char name[128] = "Mandelbrot set with pthreads";
+  char *name_pointer = name;
+  XTextProperty text_property;
+  Status status = XStringListToTextProperty(&name_pointer, 1, &text_property);
+  if (status) {
+    XSetWMName(display, window, &text_property);
+  }
+
+  XFlush(display);
+  x11_init_image(image_size);
   gc = XCreateGC(display, window, 0, NULL);
-  XSetForeground(display, gc, black);
-
   XSelectInput(display, window, ExposureMask | KeyPressMask);
 }
 
-static void x11_destroy(void) {
+static void x11_destroy() {
   XDestroyImage(x_image);
   XDestroyWindow(display, window);
   XCloseDisplay(display);
